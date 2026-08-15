@@ -15,7 +15,7 @@ private:
     static constexpr size_t MAX_FRAME_LEN = 16;  // 最大帧长度保护
     
     State current_state = State::FIND_HEADER1;
-    uint8_t buffer[MAX_FRAME_LEN] = {0};  // 最大帧：AA 55 + TYPE + LEN + DATA(最多8字节) + CHECKSUM
+    uint8_t buffer[MAX_FRAME_LEN] = {0};  
     size_t index = 0;          // 当前已接收字节数
     uint8_t data_len = 0;      // 从帧里解析出的数据长度
     
@@ -94,7 +94,7 @@ private:
         index++;
         
         // 如果刚收到 LEN 字段（位置 3），记录数据长度
-        if (index == 4) {  // buffer[3] 是 LEN，收完后 index 变成 4
+        if (index == 4) { 
             data_len = buffer[3];
 
             // 长度合法性检查：规定type=0x01长度必须为4B
@@ -105,14 +105,13 @@ private:
         }
         
         // 判断是否收完了整个帧
-        // 总字节数 = 帧头(2) + TYPE(1) + LEN(1) + DATA(data_len) + CHECKSUM(1) = 5 + data_len
         size_t total_frame_len = 5 + data_len;
         
         if (index == total_frame_len) {
             // 收完了，进入校验状态
             current_state = State::CHECK;
             
-            // 计算校验和（从 buffer[2] 到 buffer[4+data_len-1]，即从 TYPE 到 DATA 最后一个字节）
+            // 计算校验和从 TYPE 到 DATA 最后一个字节
             uint8_t calc_checksum = 0;
             for (size_t i = 2; i < 4 + data_len; i++) {
                 calc_checksum += buffer[i];
@@ -128,12 +127,12 @@ private:
                 humidity = humi_raw / 10.0f;
                 
                 std::cout << "[OK] Temperature: " << temperature << " C, "
-                        << "Humidity: " << humidity << " %" << std::endl;
+                    << "Humidity: " << humidity << " %" << std::endl;
             } else {
                 std::cout << "[ERROR] Checksum mismatch! "
-                        << "calc=0x" << std::hex << (int)calc_checksum 
-                        << ", recv=0x" << (int)received_checksum 
-                        << std::dec << std::endl;
+                    << "calc=0x" << std::hex << (int)calc_checksum 
+                    << ", recv=0x" << (int)received_checksum 
+                    << std::dec << std::endl;
             }
 
             // ====== 无论成败，清空状态，重新开始 ======
