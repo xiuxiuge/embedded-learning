@@ -10,6 +10,12 @@ enum class State {
     CHECK          // 校验并解析
 };
 
+// 温湿度数据
+struct SensorData {
+    float temperature;
+    float humidity;
+};
+
 class FrameParser {
 private:
     static constexpr size_t MAX_FRAME_LEN = 16;  // 最大帧长度保护
@@ -20,8 +26,8 @@ private:
     uint8_t data_len = 0;      // 从帧里解析出的数据长度
     
     // 温湿度结果
-    float temperature = 0.0f;
-    float humidity = 0.0f;
+    SensorData m_data{0.0f, 0.0f}; // 存储解析出的数据，等待外部来取
+    bool m_hasNewData = false;
     
 public:
     // 核心函数：每收到一个字节调用一次
@@ -43,17 +49,21 @@ public:
     }
     
     // 获取解析结果
-    float getTemperature() const { return temperature; }
-    float getHumidity() const { return humidity; }
-    bool hasValidData() const { return temperature != 0.0f || humidity != 0.0f; }
-    
+    bool getData(SensorData& data) {
+        if (!m_hasNewData) {
+            return false;
+        }
+        data = m_data;        // 拷贝出去
+        m_hasNewData = false; // 消费掉
+        return true;
+    }
+
     // 重置状态机（用于外部强制复位）
     void reset() {
         current_state = State::FIND_HEADER1;
         index = 0;
         data_len = 0;
-        temperature = 0.0f;
-        humidity = 0.0f;
+        // 不要重置 m_data 和 m_hasNewData
     }
 
 private:
@@ -122,17 +132,13 @@ private:
 
                 // ====== 校验成功，解析数据 ======
                 uint16_t temp_raw = (buffer[4] << 8) | buffer[5];
-                temperature = temp_raw / 10.0f;
+                m_data.temperature = temp_raw / 10.0f;
                 uint16_t humi_raw = (buffer[6] << 8) | buffer[7];
-                humidity = humi_raw / 10.0f;
+                m_data.humidity = humi_raw / 10.0f;
                 
-                std::cout << "[OK] Temperature: " << temperature << " C, "
-                    << "Humidity: " << humidity << " %" << std::endl;
+                m_hasNewData = true;  // 标记有新数据
             } else {
-                std::cout << "[ERROR] Checksum mismatch! "
-                    << "calc=0x" << std::hex << (int)calc_checksum 
-                    << ", recv=0x" << (int)received_checksum 
-                    << std::dec << std::endl;
+                
             }
 
             // ====== 无论成败，清空状态，重新开始 ======
@@ -144,51 +150,6 @@ private:
 // ========== 测试代码 ==========
 int main() {
     FrameParser parser;
-    
-    // // 测试1：完整正确的帧
-    // std::cout << "=== Test 1: Normal frame ===" << std::endl;
-    // std::vector<uint8_t> test1 = {
-    //     0xAA, 0x55,        // 帧头
-    //     0x01,              // TYPE
-    //     0x04,              // LEN = 4
-    //     0x01, 0x00,        // 温度：256 -> 25.6 C
-    //     0x02, 0x0B,        // 湿度：523 -> 52.3 %
-    //     0x13               // CHECKSUM: 0x01+0x04+0x01+0x00+0x02+0x0B = 0x13
-    // };
-    // for (uint8_t b : test1) {
-    //     parser.feedByte(b);
-    // }
-    
-    // // 测试2：前面有垃圾数据
-    // std::cout << "\n=== Test 2: With garbage prefix ===" << std::endl;
-    // std::vector<uint8_t> test2 = {
-    //     0x00, 0xFF, 0x12,  // 垃圾数据
-    //     0xAA, 0x55,        // 帧头
-    //     0x01, 
-    //     0x04,
-    //     0x01, 0x00,
-    //     0x02, 0x0B,
-    //     0x13
-    // };
-    // for (uint8_t b : test2) {
-    //     parser.feedByte(b);
-    // }
-    
-    // // 测试3：帧头中间有干扰 (AA AA 55)
-    // std::cout << "\n=== Test 3: Double AA before header ===" << std::endl;
-    // std::vector<uint8_t> test3 = {
-    //     0xAA, 0xAA, 0x55,  // 第一个 AA 是垃圾，第二个 AA 是真正的帧头
-    //     0x01, 
-    //     0x04,
-    //     0x01, 0x00,
-    //     0x02, 0x0B,
-    //     0x13
-    // };
-    // for (uint8_t b : test3) {
-    //     parser.feedByte(b);
-    // }
-    
-    // final_test
     std::cout << "\n=== Final test: Checksum error ===" << std::endl;
     std::vector<uint8_t> test4 = {
         0x00, 0xFF, 0xAA, 0x12, 0x34, 0xAA, 0x55, 0x01, 0x04, 0x01,
@@ -196,8 +157,16 @@ int main() {
         0x02, 0x0C, 0x13, 0xAA, 0x55, 0x01, 0x04, 0x01, 0x00, 0x02,
         0x0B, 0x13
     };
+    
     for (uint8_t b : test4) {
         parser.feedByte(b);
+        
+        // 每次喂完字节，检查是否有新数据
+        SensorData data;
+        if (parser.getData(data)) {
+            std::cout << "[OK] Temperature: " << data.temperature << " C, "
+                      << "Humidity: " << data.humidity << " %" << std::endl;
+        }
     }
 
     return 0;
