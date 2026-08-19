@@ -94,31 +94,21 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
   /*
-    按键控制LD2-PA5亮灭：按住灯灭，松开灯亮
+    HAL实现功能：
+    	按住按键灯熄灭，松开灯亮
   */
-
-  /*
-    实现功能：
-    	台灯控制，按键后灯泡反转状态
-  */
-  while(1)
+  while (1)
   {
-
+    /* USER CODE END WHILE */
       if(HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_13)==GPIO_PIN_RESET)
       {
-          HAL_Delay(20); // 消抖
-
-          if(HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_13)==GPIO_PIN_RESET)
-          {
-              HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_5);
-
-              // 等待按键释放;
-              while(HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_13)==GPIO_PIN_RESET) ;
-
-              HAL_Delay(20); // 消抖
-          }
+          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
       }
-
+      else
+      {
+          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+      }
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
