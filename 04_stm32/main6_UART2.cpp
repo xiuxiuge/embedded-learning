@@ -253,10 +253,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+  // GPIO_InitStruct.Pin = GPIO_PIN_13;
+  // GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  // GPIO_InitStruct.Pull = GPIO_NOPULL;
+  // HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA5 */
   GPIO_InitStruct.Pin = GPIO_PIN_5;
@@ -281,6 +281,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
     if (huart->Instance == USART2)
     {
+        // 根据接收到的字符控制 LED
         if (uart_rx_byte == '1')
         {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
@@ -289,6 +290,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         {
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
         }
+        
         // 启动串口接收中断：接收1个字节，收到后触发回调
         HAL_UART_Receive_IT(&huart2, &uart_rx_byte, 1);
     }
