@@ -1,9 +1,21 @@
 #include "main.h"
 #include "uart_driver.h"
+#include "FrameParser.h"
 #include <string.h>   // 为了 strlen
 #include <stdio.h>
 
+// 全局对象
+FrameParser parser;
 UART_HandleTypeDef huart2;
+
+// 建立打印映射表（顺序必须和枚举定义一致）
+const char* ParseErrorStrings[] = {
+    "NONE",
+    "TYPE_ERROR",
+    "LENGTH_ERROR",
+    "CHECKSUM_ERROR",
+    "BUFFER_OVERFLOW"
+};
 
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
@@ -23,44 +35,37 @@ int main(void)
     MX_GPIO_Init();
     MX_USART2_UART_Init();
 
+    // 初始化解析器
+    FrameParser_Init(&parser);
+
     // 初始化环形缓冲区
     ring_buffer_init(&uart_rb);
-
     // 启动 UART 中断接收
     UART_RX_Start();
 
-    uint8_t rx_data;
-    uint8_t msg[64];
-    uint16_t idx = 0;
+    uint8_t byte;  // 存放当前字节
+    SensorData data; // 存放当前数据
 
+    int cnt = 0;
     while (1)
     {
-        // 从环形缓冲区读取数据
-        while (ring_buffer_get(&uart_rb, &rx_data))
+        while (ring_buffer_get(&uart_rb, &byte))
         {
-            // 收到换行符表示一帧结束（PC 串口工具默认发 \r\n）
-            if (rx_data == '\n' || rx_data == '\r')
-            {
-                if (idx > 0)
-                {
-                    msg[idx] = '\0';   // 字符串结束
-                    printf("receive: %s\r\n", msg);
-                    idx = 0;           // 复位，准备接收下一帧
-                }
-            }
-            else
-            {
-                if (idx < sizeof(msg) - 1)
-                {
-                    msg[idx++] = rx_data;
-                }
-                else
-                {
-                    // 防止溢出，清空
-                    idx = 0;
-                }
-            }
+            FrameParser_FeedByte(&parser, byte);
+            cnt++;
         }
+        if (cnt == 9) {
+			ParseError err = FrameParser_GetLastError(&parser);
+			printf("Last Error:%s\r\n", ParseErrorStrings[err]);
+			cnt = 0;
+		}
+        if (FrameParser_GetData(&parser, &data))
+        {
+            printf("T=%.1f  H=%.1f\r\n", data.temperature, data.humidity);
+            cnt = 0;
+        }
+
+
     }
 }
 /**
